@@ -1,0 +1,93 @@
+import pandas as pd
+import numpy as np
+import glob
+import re
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
+
+def extract_target_from_filename(filename):
+    match = re.search(r'\d+', filename)
+    if match:
+        return float(match.group(0))
+    else:
+        return None
+
+def load_data_from_folder(folder_path):
+    files = glob.glob(folder_path + '/*.xls')
+    data_list = []
+    target_list = []
+
+    for file in files:
+        df = pd.read_excel(file, header=None)
+        target = extract_target_from_filename(file)
+        if target is not None:
+            data_list.append(df.values)
+            target_list.append(target)
+
+    return np.concatenate(data_list, axis=0), np.array(target_list)
+
+def preprocess_data(data, targets):
+    scaler = MinMaxScaler()
+    data_normalized = scaler.fit_transform(data.reshape(-1, 1)).reshape(data.shape)
+    return data_normalized, targets, scaler
+
+def create_sequences_and_targets(data, targets, seq_length=10):
+    X, y = [], []
+    for i in range(len(data) - seq_length):
+        X.append(data[i:i+seq_length])
+        y.append(targets[i + seq_length - 1])
+    return np.array(X), np.array(y)
+
+# Load training data
+train_folder = './train_folder'
+train_data, train_targets = load_data_from_folder(train_folder)
+train_data_normalized, train_targets, scaler = preprocess_data(train_data, train_targets)
+
+# Create sequences
+seq_length = 10  # Adjust based on your data
+X_train, y_train = create_sequences_and_targets(train_data_normalized, train_targets, seq_length)
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropout, BatchNormalization
+
+def create_deep_cnn_model(input_shape):
+    model = Sequential()
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
+    model.add(BatchNormalization())
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=256, kernel_size=3, activation='relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Flatten())
+    model.add(Dense(256, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
+
+# Training data shape
+input_shape_cnn = (X_train.shape[1], X_train.shape[2])
+
+# Initialize the deep CNN model
+cnn_model = create_deep_cnn_model(input_shape_cnn)
+
+# Function to train and evaluate the model
+def train_and_evaluate(model, X_train, y_train, X_test, y_test, epochs=50, batch_size=32):
+    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2)
+    loss = model.evaluate(X_test, y_test)
+    print(f'Test Loss: {loss}')
+    return model
+
+# Load testing data
+test_folder = './test_folder'
+test_data, test_targets = load_data_from_folder(test_folder)
+test_data_normalized, test_targets, _ = preprocess_data(test_data, test_targets)
+X_test, y_test = create_sequences_and_targets(test_data_normalized, test_targets, seq_length)
+
+# Train and evaluate the deep CNN model
+print("Deep CNN Model:")
+cnn_model = train_and_evaluate(cnn_model, X_train, y_train, X_test, y_test)
