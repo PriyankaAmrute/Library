@@ -91,3 +91,33 @@ X_test, y_test = create_sequences_and_targets(test_data_normalized, test_targets
 # Train and evaluate the deep CNN model
 print("Deep CNN Model:")
 cnn_model = train_and_evaluate(cnn_model, X_train, y_train, X_test, y_test)
+
+ADD BACKGROUND IMAGE
+import streamlit as st
+import base64
+
+# Function to convert image to base64
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# Function to set background
+def set_background(png_file):
+    bin_str = get_base64_of_bin_file(png_file)
+    css = f"""
+    <style>
+    .stApp {{
+        background: url(data:image/png;base64,{bin_str});
+        background-size: cover;
+        filter: blur(8px);  /* Adjust the blur level as needed */
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+# Example usage
+set_background('path/to/your/background_image.png')
+
+st.title("CT-PIU Gap Measurement")
+st.write("This is an example application with a background image.")
